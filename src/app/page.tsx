@@ -1,98 +1,171 @@
-import Image from "next/image";
-import { ConnectButton } from "thirdweb/react";
-import thirdwebIcon from "@public/thirdweb.svg";
-import { client } from "./client";
+"use client";
+
+import CandidateCard from "@/components/CandidateCard";
+import TopBar from "@/components/TopBar";
+import { useEffect, useState } from "react";
+import { Button, Box } from "@mui/material";
+
+import { prepareContractCall } from "thirdweb";
+import {
+  useSendTransaction,
+  useReadContract,
+  useActiveAccount,
+} from "thirdweb/react";
+import { contract } from "../app/layout";
+
+type Candidate = {
+  address: string;
+  name: string;
+  id: bigint;
+};
 
 export default function Home() {
-  return (
-    <main className="p-4 pb-10 min-h-[100vh] flex items-center justify-center container max-w-screen-lg mx-auto">
-      <div className="py-20">
-        <Header />
+  const activeAccount = useActiveAccount();
+  const { mutate: sendTransaction } = useSendTransaction();
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [selectedCandidateAddress, setSelectedCandidateAddress] = useState("");
+  const [voterName, setVoterName] = useState("");
+  const [selectedCandidateId, setSelectedCandidateId] = useState(0n);
 
-        <div className="flex justify-center mb-20">
-          <ConnectButton
-            client={client}
-            appMetadata={{
-              name: "Example App",
-              url: "https://example.com",
-            }}
-          />
+  const { data: voted, isLoading } = useReadContract({
+    contract,
+    method: "function voters(address) view returns (bool)",
+    params: [activeAccount?.address as `0x${string}`],
+  });
+
+  const { data: votingActive, isLoading: isLoading2 } = useReadContract({
+    contract,
+    method: "function votingActive() view returns (bool)",
+    params: [],
+  });
+
+  const { data: registrationActive, isLoading: isLoading3 } = useReadContract({
+    contract,
+    method: "function registrationActive() view returns (bool)",
+    params: [],
+  });
+
+  const { data: voterProfile, isLoading: isLoading4 } = useReadContract({
+    contract,
+    method:
+      "function registeredVoters(address) view returns (address voterAddress, string name, bool voted)",
+    params: [activeAccount?.address as `0x${string}`],
+  });
+
+  useEffect(() => {
+    async function fetchData() {
+      const res = await fetch(
+        "https://ipfs.io/ipfs/QmRHkt5XxUeWJtMrxW1wTDs3GDYY91H8CGWL8WfezbeDAR"
+      );
+      // ipfs://QmRHkt5XxUeWJtMrxW1wTDs3GDYY91H8CGWL8WfezbeDAR
+      const data = await res.json();
+
+      setCandidates(data);
+    }
+
+    fetchData();
+  }, []);
+
+  return (
+    <>
+      <TopBar />
+
+      {votingActive ? (
+        voted ? (
+          <h1 className="text-center">You have already voted!</h1>
+        ) : (
+          <h1 className="text-center">
+            Voting is active! Select your candidate
+          </h1>
+        )
+      ) : registrationActive ? (
+        <h1 className="text-center">Registration is active!</h1>
+      ) : (
+        <h1 className="text-center">Voting is not active!</h1>
+      )}
+
+      {registrationActive ? (
+        voterProfile?.[0] === "0x0000000000000000000000000000000000000000" ? (
+          <div className="mt-3 p-4 flex justify-center max-w-screen-lg w-full mx-auto">
+            <Box sx={{ mr: 1 }}>
+              <input
+                className="custom-input"
+                placeholder="Enter name"
+                onChange={(e) => setVoterName(e.target.value)}
+                value={voterName}
+              />
+            </Box>
+            <Button
+              variant="contained"
+              onClick={() => {
+                const transaction = prepareContractCall({
+                  contract,
+                  method: "function registerVoter(string _name)",
+                  params: [voterName],
+                });
+                sendTransaction(transaction);
+                setVoterName("");
+              }}
+            >
+              Submit
+            </Button>
+          </div>
+        ) : (
+          <>
+            <h1 className="text-center">
+              Your Registration has been submitted!
+            </h1>
+          </>
+        )
+      ) : (
+        <div className="mt-3 p-4 flex justify-between max-w-screen-lg w-full mx-auto">
+          {candidates.map((candidate) => (
+            <CandidateCard
+              key={candidate.id}
+              selected={candidate.address === selectedCandidateAddress}
+              name={candidate.name}
+              address={candidate.address}
+              id={candidate.id}
+              onClick={() => {
+                setSelectedCandidateAddress(candidate.address);
+                setSelectedCandidateId(candidate.id);
+              }}
+            />
+          ))}
         </div>
+      )}
 
-        <ThirdwebResources />
-      </div>
-    </main>
-  );
-}
+      {votingActive && !registrationActive && !voted && (
+        <div className="mt-3 p-4 justify-center flex mx-auto w-full">
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (!selectedCandidateAddress || !selectedCandidateId) {
+                alert("Please select a candidate");
+                return;
+              }
 
-function Header() {
-  return (
-    <header className="flex flex-col items-center mb-20 md:mb-20">
-      <Image
-        src={thirdwebIcon}
-        alt=""
-        className="size-[150px] md:size-[150px]"
-        style={{
-          filter: "drop-shadow(0px 0px 24px #a726a9a8)",
-        }}
-      />
-
-      <h1 className="text-2xl md:text-6xl font-semibold md:font-bold tracking-tighter mb-6 text-zinc-100">
-        thirdweb SDK
-        <span className="text-zinc-300 inline-block mx-1"> + </span>
-        <span className="inline-block -skew-x-6 text-blue-500"> Next.js </span>
-      </h1>
-
-      <p className="text-zinc-300 text-base">
-        Read the{" "}
-        <code className="bg-zinc-800 text-zinc-300 px-2 rounded py-1 text-sm mx-1">
-          README.md
-        </code>{" "}
-        file to get started.
-      </p>
-    </header>
-  );
-}
-
-function ThirdwebResources() {
-  return (
-    <div className="grid gap-4 lg:grid-cols-3 justify-center">
-      <ArticleCard
-        title="thirdweb SDK Docs"
-        href="https://portal.thirdweb.com/typescript/v5"
-        description="thirdweb TypeScript SDK documentation"
-      />
-
-      <ArticleCard
-        title="Components and Hooks"
-        href="https://portal.thirdweb.com/typescript/v5/react"
-        description="Learn about the thirdweb React components and hooks in thirdweb SDK"
-      />
-
-      <ArticleCard
-        title="thirdweb Dashboard"
-        href="https://thirdweb.com/dashboard"
-        description="Deploy, configure, and manage your smart contracts from the dashboard."
-      />
-    </div>
-  );
-}
-
-function ArticleCard(props: {
-  title: string;
-  href: string;
-  description: string;
-}) {
-  return (
-    <a
-      href={props.href + "?utm_source=next-template"}
-      target="_blank"
-      className="flex flex-col border border-zinc-800 p-4 rounded-lg hover:bg-zinc-900 transition-colors hover:border-zinc-700"
-    >
-      <article>
-        <h2 className="text-lg font-semibold mb-2">{props.title}</h2>
-        <p className="text-sm text-zinc-400">{props.description}</p>
-      </article>
-    </a>
+              if (voted) {
+                alert("You have already voted");
+                setSelectedCandidateId(0n);
+                setSelectedCandidateAddress("");
+                return;
+              }
+              const transaction = prepareContractCall({
+                contract,
+                method: "function vote(address _candidateAddress, uint256 _id)",
+                params: [
+                  selectedCandidateAddress as `0x${string}`,
+                  selectedCandidateId,
+                ],
+              });
+              sendTransaction(transaction);
+            }}
+          >
+            Cast Vote
+          </Button>
+        </div>
+      )}
+    </>
   );
 }
