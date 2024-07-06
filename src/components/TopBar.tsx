@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import {
   ConnectButton,
@@ -5,7 +7,8 @@ import {
   useReadContract,
   useSendTransaction,
 } from "thirdweb/react";
-import { client, contract } from "../app/layout";
+import { client } from "../app/client";
+import { contract } from "../app/contract";
 import { Box, Button } from "@mui/material";
 import { prepareContractCall } from "thirdweb";
 

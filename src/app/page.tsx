@@ -5,14 +5,15 @@ import TopBar from "@/components/TopBar";
 import { useEffect, useState } from "react";
 import { Button, Box } from "@mui/material";
 
-import { prepareContractCall } from "thirdweb";
+import { prepareContractCall, getContract, defineChain } from "thirdweb";
 import {
   useSendTransaction,
   useReadContract,
   useActiveAccount,
 } from "thirdweb/react";
-import { contract } from "../app/layout";
 
+// import { client } from "./client";
+import { contract } from "./contract";
 type Candidate = {
   address: string;
   name: string;
